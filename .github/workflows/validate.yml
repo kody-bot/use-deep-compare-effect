@@ -19,61 +19,91 @@ jobs:
         node: [10.13, 12, 14, 15]
     runs-on: ubuntu-latest
     steps:
-      - name: 🛑 Cancel Previous Runs
+      - name: ð Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.6.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: ⬇️ Checkout repo
+      - name: â¬ï¸ Checkout repo
         uses: actions/checkout@v2
 
-      - name: ⎔ Setup node
+      - name: â Setup node
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node }}
 
-      - name: 📥 Download deps
+      - name: ð¥ Download deps
         uses: bahmutov/npm-install@v1
         with:
           useLockFile: false
 
-      - name: ▶️ Run validate script
+      - name: â¶ï¸ Run validate script
         run: npm run validate
 
-      - name: ⬆️ Upload coverage report
+      - name: â¬ï¸ Upload coverage report
         uses: codecov/codecov-action@v1
 
-  release:
+  build-release-artifact:
     needs: main
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if:
       ${{ github.repository == 'kentcdodds/use-deep-compare-effect' &&
       contains('refs/heads/main,refs/heads/beta,refs/heads/next,refs/heads/alpha',
       github.ref) && github.event_name == 'push' }}
     steps:
-      - name: 🛑 Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.6.0
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: ⬇️ Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
 
       - name: ⎔ Setup node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@f1f314fca9dfce2769ece7d933488f076716723e # v1
         with:
           node-version: 14
 
-      - name: 📥 Download deps
-        uses: bahmutov/npm-install@v1
-        with:
-          useLockFile: false
+      - name: 📥 Install deps
+        run: npm install --ignore-scripts
 
       - name: 🏗 Run build script
         run: npm run build
 
+      - name: 📦 Upload package artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: npm-package-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    needs: build-release-artifact
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to be able to publish a GitHub release
+      issues: write # to be able to comment on released issues
+      pull-requests: write # to be able to comment on released pull requests
+    if:
+      ${{ github.repository == 'kentcdodds/use-deep-compare-effect' &&
+      contains('refs/heads/main,refs/heads/beta,refs/heads/next,refs/heads/alpha',
+      github.ref) && github.event_name == 'push' }}
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2
+
+      - name: ⎔ Setup node
+        uses: actions/setup-node@f1f314fca9dfce2769ece7d933488f076716723e # v1
+        with:
+          node-version: 14
+          registry-url: https://registry.npmjs.org
+
+      - name: 📦 Download package artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: npm-package-dist
+          path: dist
+
       - name: 🚀 Release
-        uses: cycjimmy/semantic-release-action@v2
+        uses: cycjimmy/semantic-release-action@5982a02995853159735cb838992248c4f0f16166 # v2
         with:
           semantic_version: 17
           branches: |
